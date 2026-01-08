@@ -17,7 +17,7 @@ CREATE TABLE groups (
 CREATE TABLE group_members (
   group_id BIGINT NOT NULL,
   user_id BIGINT NOT NULL,
-  role VARCHAR(20) NOT NULL,
+  role ENUM('OWNER','MEMBER') NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (group_id, user_id),
   CONSTRAINT fk_group_members_group FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
@@ -59,7 +59,7 @@ CREATE TABLE places (
 CREATE TABLE place_status (
   place_id BIGINT NOT NULL,
   user_id BIGINT NOT NULL,
-  status VARCHAR(20) NOT NULL,
+  status ENUM('PENDING','VISITED') NOT NULL,
   is_favorite BOOLEAN NOT NULL DEFAULT FALSE,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (place_id, user_id),
