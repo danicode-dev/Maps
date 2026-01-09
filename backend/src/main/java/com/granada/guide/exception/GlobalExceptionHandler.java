@@ -27,7 +27,7 @@ public class GlobalExceptionHandler {
       fieldErrors.put(error.getField(), error.getDefaultMessage());
     }
     Map<String, Object> body = new HashMap<>();
-    body.put("message", "Validation failed");
+    body.put("message", "Validacion fallida");
     body.put("errors", fieldErrors);
     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
   }
@@ -35,7 +35,7 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(DataIntegrityViolationException.class)
   public ResponseEntity<Map<String, Object>> handleDataIntegrity(DataIntegrityViolationException ex) {
     Map<String, Object> body = new HashMap<>();
-    body.put("message", "Data integrity violation");
+    body.put("message", "Conflicto de datos");
     return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
   }
 }

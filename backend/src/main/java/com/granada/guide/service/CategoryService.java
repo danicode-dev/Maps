@@ -28,7 +28,8 @@ public class CategoryService {
 
   public CategoryResponse create(Long userId, CreateCategoryRequest request) {
     if (!groupService.isOwnerAnywhere(userId)) {
-      throw new ApiException(HttpStatus.FORBIDDEN, "Owner role required to create categories");
+      throw new ApiException(HttpStatus.FORBIDDEN,
+          "Se requiere ser propietario para crear categorias");
     }
     Category category = new Category();
     category.setName(request.name());

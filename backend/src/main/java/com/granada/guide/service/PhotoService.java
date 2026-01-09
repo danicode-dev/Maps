@@ -8,6 +8,7 @@ import com.granada.guide.entity.User;
 import com.granada.guide.exception.ApiException;
 import com.granada.guide.repository.PhotoRepository;
 import com.granada.guide.repository.PlaceRepository;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
@@ -58,16 +59,34 @@ public class PhotoService {
     return toResponse(saved);
   }
 
+  @Transactional
+  public void delete(Long userId, Long photoId) {
+    Photo photo = photoRepository.findById(photoId)
+        .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Foto no encontrada"));
+    groupService.getGroupForMember(photo.getPlace().getGroup().getId(), userId);
+    photoRepository.delete(photo);
+  }
+
+  @Transactional(readOnly = true)
+  public PhotoFile loadFile(Long userId, Long photoId) {
+    Photo photo = photoRepository.findById(photoId)
+        .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Foto no encontrada"));
+    groupService.getGroupForMember(photo.getPlace().getGroup().getId(), userId);
+    Path path = fileStorageService.resolvePath(photo.getUrl());
+    return new PhotoFile(fileStorageService.loadAsResource(path),
+        fileStorageService.detectContentType(path));
+  }
+
   private Place getPlaceForMember(Long placeId, Long userId) {
     Place place = placeRepository.findById(placeId)
-        .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Place not found"));
+        .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Sitio no encontrado"));
     groupService.getGroupForMember(place.getGroup().getId(), userId);
     return place;
   }
 
   private PhotoResponse toResponse(Photo photo) {
     UserSummary user = new UserSummary(photo.getUser().getId(), photo.getUser().getName());
-    return new PhotoResponse(photo.getId(), user, photo.getUrl(), photo.getCaption(),
-        photo.getCreatedAt());
+    String fileUrl = "/api/photos/" + photo.getId() + "/file";
+    return new PhotoResponse(photo.getId(), user, fileUrl, photo.getCaption(), photo.getCreatedAt());
   }
 }

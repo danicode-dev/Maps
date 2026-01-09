@@ -12,7 +12,7 @@ export function RegisterPage() {
   const [loading, setLoading] = useState(false);
 
   if (token) {
-    return <Navigate to="/app/map" replace />;
+    return <Navigate to="/" replace />;
   }
 
   const onSubmit = async (event: React.FormEvent) => {
@@ -21,7 +21,7 @@ export function RegisterPage() {
     setLoading(true);
     try {
       await register(email, password, name);
-      navigate("/app/map");
+      navigate("/");
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -33,7 +33,7 @@ export function RegisterPage() {
     <div className="auth-page">
       <div className="auth-card">
         <h1>Crear cuenta</h1>
-        <p>Solo para vosotros dos.</p>
+        <p>Solo para ustedes dos.</p>
         <form onSubmit={onSubmit} className="form">
           <label>
             Nombre
@@ -63,11 +63,11 @@ export function RegisterPage() {
           </label>
           {error && <div className="form-error">{error}</div>}
           <button className="primary-button" type="submit" disabled={loading}>
-            {loading ? "Creando..." : "Registrarme"}
+            {loading ? "Creando cuenta..." : "Crear cuenta"}
           </button>
         </form>
         <p className="auth-footer">
-          Ya tienes cuenta? <Link to="/login">Entrar</Link>
+          Ya tienes cuenta? <Link to="/login">Inicia sesion</Link>
         </p>
       </div>
     </div>

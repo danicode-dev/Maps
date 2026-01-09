@@ -18,13 +18,16 @@ public class AuthService {
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
   private final JwtTokenProvider jwtTokenProvider;
+  private final GroupService groupService;
 
   public AuthService(UserRepository userRepository,
       PasswordEncoder passwordEncoder,
-      JwtTokenProvider jwtTokenProvider) {
+      JwtTokenProvider jwtTokenProvider,
+      GroupService groupService) {
     this.userRepository = userRepository;
     this.passwordEncoder = passwordEncoder;
     this.jwtTokenProvider = jwtTokenProvider;
+    this.groupService = groupService;
   }
 
   public MeResponse me(UserPrincipal principal) {
@@ -34,22 +37,23 @@ public class AuthService {
   public AuthResponse register(RegisterRequest request) {
     String normalized = request.email().toLowerCase();
     if (userRepository.findByEmail(normalized).isPresent()) {
-      throw new ApiException(HttpStatus.CONFLICT, "Email already registered");
+      throw new ApiException(HttpStatus.CONFLICT, "El correo ya esta registrado");
     }
     User user = new User();
     user.setEmail(normalized);
     user.setName(request.name());
     user.setPasswordHash(passwordEncoder.encode(request.password()));
     User saved = userRepository.save(user);
+    groupService.getOrCreateDefaultGroupForUser(saved);
     String token = jwtTokenProvider.generateToken(UserPrincipal.fromUser(saved));
     return new AuthResponse(token);
   }
 
   public AuthResponse login(LoginRequest request) {
     User user = userRepository.findByEmail(request.email().toLowerCase())
-        .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));
+        .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Credenciales invalidas"));
     if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-      throw new ApiException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
+      throw new ApiException(HttpStatus.UNAUTHORIZED, "Credenciales invalidas");
     }
     String token = jwtTokenProvider.generateToken(UserPrincipal.fromUser(user));
     return new AuthResponse(token);
@@ -57,6 +61,6 @@ public class AuthService {
 
   public User getUserOrThrow(Long userId) {
     return userRepository.findById(userId)
-        .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "User not found"));
+        .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Usuario no encontrado"));
   }
 }

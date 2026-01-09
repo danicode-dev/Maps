@@ -28,3 +28,8 @@ Thumbs.db
 
 # Uploads
 backend/uploads/
+
+# Local artifacts
+.tmp/
+.logs/
+.tools/

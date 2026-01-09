@@ -5,30 +5,16 @@ import com.granada.guide.dto.CommonDtos.UserSummary;
 import com.granada.guide.dto.PlaceDtos.CreatePlaceRequest;
 import com.granada.guide.dto.PlaceDtos.PlaceResponse;
 import com.granada.guide.dto.PlaceDtos.UpdatePlaceRequest;
-import com.granada.guide.dto.PlaceDtos.UpdateStatusRequest;
-import com.granada.guide.entity.Category;
 import com.granada.guide.entity.Group;
-import com.granada.guide.entity.GroupMember;
+import com.granada.guide.entity.Category;
 import com.granada.guide.entity.Place;
-import com.granada.guide.entity.PlaceStatus;
-import com.granada.guide.entity.PlaceStatusId;
 import com.granada.guide.entity.PlaceVisitStatus;
 import com.granada.guide.entity.User;
 import com.granada.guide.exception.ApiException;
 import com.granada.guide.repository.CategoryRepository;
-import com.granada.guide.repository.GroupMemberRepository;
 import com.granada.guide.repository.PlaceRepository;
-import com.granada.guide.repository.PlaceStatusRepository;
-import com.granada.guide.util.GeoUtils;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,99 +24,63 @@ import org.springframework.util.StringUtils;
 public class PlaceService {
   private final PlaceRepository placeRepository;
   private final CategoryRepository categoryRepository;
-  private final GroupMemberRepository groupMemberRepository;
-  private final PlaceStatusRepository placeStatusRepository;
   private final GroupService groupService;
   private final AuthService authService;
 
   public PlaceService(PlaceRepository placeRepository,
       CategoryRepository categoryRepository,
-      GroupMemberRepository groupMemberRepository,
-      PlaceStatusRepository placeStatusRepository,
       GroupService groupService,
       AuthService authService) {
     this.placeRepository = placeRepository;
     this.categoryRepository = categoryRepository;
-    this.groupMemberRepository = groupMemberRepository;
-    this.placeStatusRepository = placeStatusRepository;
     this.groupService = groupService;
     this.authService = authService;
   }
 
   @Transactional
   public PlaceResponse createPlace(Long userId, CreatePlaceRequest request) {
-    Group group = groupService.getGroupForMember(request.groupId(), userId);
     User user = authService.getUserOrThrow(userId);
-    Category category = categoryRepository.findById(request.categoryId())
-        .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Category not found"));
+    Group group = groupService.getOrCreateDefaultGroupForUser(user);
 
     Place place = new Place();
     place.setGroup(group);
     place.setName(request.name());
-    place.setDescription(request.description());
-    place.setCategory(category);
+    place.setNotes(request.notes());
+    place.setAddress(request.address());
     place.setLat(request.lat());
     place.setLng(request.lng());
-    place.setAddress(request.address());
+    place.setStatus(request.status());
+    place.setVisitedAt(request.status() == PlaceVisitStatus.VISITED ? Instant.now() : null);
+    if (request.categoryId() != null) {
+      place.setCategory(getCategoryOrThrow(request.categoryId()));
+    }
     place.setCreatedBy(user);
     Place saved = placeRepository.save(place);
-
-    List<GroupMember> members = groupMemberRepository.findByGroup_Id(group.getId());
-    List<PlaceStatus> statuses = new ArrayList<>();
-    for (GroupMember member : members) {
-      PlaceStatus status = new PlaceStatus();
-      status.setPlace(saved);
-      status.setUser(member.getUser());
-      status.setStatus(PlaceVisitStatus.PENDING);
-      status.setId(new PlaceStatusId(saved.getId(), member.getUser().getId()));
-      statuses.add(status);
-    }
-    placeStatusRepository.saveAll(statuses);
-
-    PlaceStatus selfStatus = statuses.stream()
-        .filter(ps -> ps.getUser().getId().equals(userId))
-        .findFirst()
-        .orElse(null);
-    return toResponse(saved, selfStatus);
+    return toResponse(saved);
   }
 
   @Transactional(readOnly = true)
-  public Page<PlaceResponse> listPlaces(Long userId, String statusValue, Long categoryId,
-      String query, Pageable pageable) {
+  public List<PlaceResponse> listPlaces(Long userId, String bboxValue, String statusValue) {
     List<Long> groupIds = groupService.getGroupIdsForUser(userId);
     if (groupIds.isEmpty()) {
-      return Page.empty(pageable);
+      return List.of();
     }
     PlaceVisitStatus statusFilter = parseStatus(statusValue);
-
-    var spec = PlaceSpecifications.belongsToGroups(groupIds);
-    if (categoryId != null) {
-      spec = spec.and(PlaceSpecifications.hasCategory(categoryId));
-    }
-    if (StringUtils.hasText(query)) {
-      spec = spec.and(PlaceSpecifications.matchesQuery(query));
-    }
-    if (statusFilter != null) {
-      spec = spec.and(PlaceSpecifications.hasStatusForUser(userId, statusFilter));
-    }
-    Page<Place> page = placeRepository.findAll(spec, pageable);
-    List<Long> placeIds = page.getContent().stream().map(Place::getId).toList();
-    Map<Long, PlaceStatus> statusMap = placeIds.isEmpty()
-        ? Map.of()
-        : placeStatusRepository.findByUser_IdAndPlace_IdIn(userId, placeIds)
-            .stream()
-            .collect(Collectors.toMap(ps -> ps.getPlace().getId(), ps -> ps));
-    List<PlaceResponse> responses = page.getContent().stream()
-        .map(place -> toResponse(place, statusMap.get(place.getId())))
+    BoundingBox bbox = parseBoundingBox(bboxValue);
+    List<Place> places = bbox == null
+        ? placeRepository.findByGroup_IdIn(groupIds)
+        : placeRepository.findByGroup_IdInAndLatBetweenAndLngBetween(
+            groupIds, bbox.minLat, bbox.maxLat, bbox.minLng, bbox.maxLng);
+    return places.stream()
+        .filter(place -> statusFilter == null || place.getStatus() == statusFilter)
+        .map(this::toResponse)
         .toList();
-    return new PageImpl<>(responses, pageable, page.getTotalElements());
   }
 
   @Transactional(readOnly = true)
   public PlaceResponse getPlace(Long userId, Long placeId) {
     Place place = getPlaceForMember(placeId, userId);
-    PlaceStatus status = placeStatusRepository.findByPlace_IdAndUser_Id(placeId, userId).orElse(null);
-    return toResponse(place, status);
+    return toResponse(place);
   }
 
   @Transactional
@@ -139,26 +89,27 @@ public class PlaceService {
     if (StringUtils.hasText(request.name())) {
       place.setName(request.name());
     }
-    if (request.description() != null) {
-      place.setDescription(request.description());
-    }
-    if (request.categoryId() != null) {
-      Category category = categoryRepository.findById(request.categoryId())
-          .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Category not found"));
-      place.setCategory(category);
-    }
-    if (request.lat() != null) {
-      place.setLat(request.lat());
-    }
-    if (request.lng() != null) {
-      place.setLng(request.lng());
+    if (request.notes() != null) {
+      place.setNotes(request.notes());
     }
     if (request.address() != null) {
       place.setAddress(request.address());
     }
+    if (request.status() != null) {
+      place.setStatus(request.status());
+      if (request.status() == PlaceVisitStatus.VISITED) {
+        place.setVisitedAt(request.visitedAt() != null ? request.visitedAt() : Instant.now());
+      } else {
+        place.setVisitedAt(null);
+      }
+    } else if (request.visitedAt() != null) {
+      place.setVisitedAt(request.visitedAt());
+    }
+    if (request.categoryId() != null) {
+      place.setCategory(getCategoryOrThrow(request.categoryId()));
+    }
     Place saved = placeRepository.save(place);
-    PlaceStatus status = placeStatusRepository.findByPlace_IdAndUser_Id(placeId, userId).orElse(null);
-    return toResponse(saved, status);
+    return toResponse(saved);
   }
 
   @Transactional
@@ -167,114 +118,85 @@ public class PlaceService {
     placeRepository.delete(place);
   }
 
-  @Transactional
-  public PlaceResponse updateStatus(Long userId, Long placeId, UpdateStatusRequest request) {
-    Place place = getPlaceForMember(placeId, userId);
-    PlaceStatus status = placeStatusRepository.findByPlace_IdAndUser_Id(placeId, userId)
-        .orElseGet(() -> {
-          PlaceStatus created = new PlaceStatus();
-          created.setPlace(place);
-          created.setUser(authService.getUserOrThrow(userId));
-          created.setId(new PlaceStatusId(place.getId(), userId));
-          return created;
-        });
-    status.setStatus(request.status());
-    status.setFavorite(request.isFavorite());
-    status.setUpdatedAt(Instant.now());
-    PlaceStatus saved = placeStatusRepository.save(status);
-    return toResponse(place, saved);
-  }
-
-  @Transactional(readOnly = true)
-  public List<PlaceResponse> nearby(Long userId, double lat, double lng, double radiusMeters,
-      String statusValue, Long categoryId) {
-    List<Long> groupIds = groupService.getGroupIdsForUser(userId);
-    if (groupIds.isEmpty()) {
-      return List.of();
-    }
-    PlaceVisitStatus statusFilter = parseStatus(statusValue);
-
-    var box = GeoUtils.boundingBox(lat, lng, radiusMeters);
-    List<Place> candidates = placeRepository.findByGroup_IdInAndLatBetweenAndLngBetween(
-        groupIds, box.minLat(), box.maxLat(), box.minLng(), box.maxLng());
-    List<Long> placeIds = candidates.stream().map(Place::getId).toList();
-    Map<Long, PlaceStatus> statusMap = placeIds.isEmpty()
-        ? Map.of()
-        : placeStatusRepository.findByUser_IdAndPlace_IdIn(userId, placeIds)
-            .stream()
-            .collect(Collectors.toMap(ps -> ps.getPlace().getId(), ps -> ps));
-    return candidates.stream()
-        .filter(place -> categoryId == null || (place.getCategory() != null
-            && place.getCategory().getId().equals(categoryId)))
-        .filter(place -> {
-          PlaceStatus status = statusMap.get(place.getId());
-          return statusFilter == null || (status != null && status.getStatus() == statusFilter);
-        })
-        .map(place -> {
-          double distance = GeoUtils.distanceMeters(lat, lng, place.getLat(), place.getLng());
-          return new PlaceDistance(place, statusMap.get(place.getId()), distance);
-        })
-        .filter(item -> item.distanceMeters <= radiusMeters)
-        .sorted(Comparator.comparingDouble(item -> item.distanceMeters))
-        .map(item -> toResponse(item.place, item.status))
-        .toList();
-  }
-
   private Place getPlaceForMember(Long placeId, Long userId) {
     Place place = placeRepository.findById(placeId)
-        .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Place not found"));
+        .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Sitio no encontrado"));
     groupService.getGroupForMember(place.getGroup().getId(), userId);
     return place;
   }
 
-  private PlaceResponse toResponse(Place place, PlaceStatus status) {
-    CategorySummary category = null;
-    if (place.getCategory() != null) {
-      category = new CategorySummary(place.getCategory().getId(),
-          place.getCategory().getName(),
-          place.getCategory().getIcon());
-    }
+  private PlaceResponse toResponse(Place place) {
     UserSummary createdBy = new UserSummary(
         place.getCreatedBy().getId(),
         place.getCreatedBy().getName());
-    PlaceVisitStatus visitStatus = status != null ? status.getStatus() : PlaceVisitStatus.PENDING;
-    boolean favorite = status != null && status.isFavorite();
+    CategorySummary category = place.getCategory() != null
+        ? new CategorySummary(
+            place.getCategory().getId(),
+            place.getCategory().getName(),
+            place.getCategory().getIcon())
+        : null;
     return new PlaceResponse(
         place.getId(),
         place.getGroup().getId(),
         place.getName(),
-        place.getDescription(),
-        category,
         place.getLat(),
         place.getLng(),
+        place.getStatus(),
+        place.getNotes(),
         place.getAddress(),
+        category,
         createdBy,
         place.getCreatedAt(),
-        visitStatus,
-        favorite
+        place.getVisitedAt()
     );
   }
 
-  private static class PlaceDistance {
-    private final Place place;
-    private final PlaceStatus status;
-    private final double distanceMeters;
-
-    private PlaceDistance(Place place, PlaceStatus status, double distanceMeters) {
-      this.place = place;
-      this.status = status;
-      this.distanceMeters = distanceMeters;
-    }
-  }
-
   private PlaceVisitStatus parseStatus(String value) {
-    if (!StringUtils.hasText(value)) {
+    if (!StringUtils.hasText(value) || value.equalsIgnoreCase("ALL")) {
       return null;
     }
     try {
       return PlaceVisitStatus.valueOf(value.toUpperCase());
     } catch (IllegalArgumentException ex) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid status value");
+      throw new ApiException(HttpStatus.BAD_REQUEST, "Estado invalido");
+    }
+  }
+
+  private BoundingBox parseBoundingBox(String value) {
+    if (!StringUtils.hasText(value)) {
+      return null;
+    }
+    String[] parts = value.split(",");
+    if (parts.length != 4) {
+      throw new ApiException(HttpStatus.BAD_REQUEST, "Formato de bbox invalido");
+    }
+    try {
+      double minLng = Double.parseDouble(parts[0]);
+      double minLat = Double.parseDouble(parts[1]);
+      double maxLng = Double.parseDouble(parts[2]);
+      double maxLat = Double.parseDouble(parts[3]);
+      return new BoundingBox(minLat, maxLat, minLng, maxLng);
+    } catch (NumberFormatException ex) {
+      throw new ApiException(HttpStatus.BAD_REQUEST, "Valores de bbox invalidos");
+    }
+  }
+
+  private Category getCategoryOrThrow(Long categoryId) {
+    return categoryRepository.findById(categoryId)
+        .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "Categoria no encontrada"));
+  }
+
+  private static class BoundingBox {
+    private final double minLat;
+    private final double maxLat;
+    private final double minLng;
+    private final double maxLng;
+
+    private BoundingBox(double minLat, double maxLat, double minLng, double maxLng) {
+      this.minLat = minLat;
+      this.maxLat = maxLat;
+      this.minLng = minLng;
+      this.maxLng = maxLng;
     }
   }
 }

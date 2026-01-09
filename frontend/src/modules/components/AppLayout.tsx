@@ -35,7 +35,7 @@ export function AppLayout() {
           Listas
         </NavLink>
         <NavLink to="/app/add" className="nav-link">
-          Anadir
+          Agregar
         </NavLink>
         <NavLink to="/app/group" className="nav-link">
           Grupo

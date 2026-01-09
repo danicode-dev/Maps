@@ -11,7 +11,7 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   if (token) {
-    return <Navigate to="/app/map" replace />;
+    return <Navigate to="/" replace />;
   }
 
   const onSubmit = async (event: React.FormEvent) => {
@@ -20,7 +20,7 @@ export function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      navigate("/app/map");
+      navigate("/");
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -31,8 +31,8 @@ export function LoginPage() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1>Bienvenidos</h1>
-        <p>Entra con tu cuenta privada.</p>
+        <h1>Hola de nuevo</h1>
+        <p>Inicia sesion con tu cuenta privada.</p>
         <form onSubmit={onSubmit} className="form">
           <label>
             Email
@@ -54,11 +54,11 @@ export function LoginPage() {
           </label>
           {error && <div className="form-error">{error}</div>}
           <button className="primary-button" type="submit" disabled={loading}>
-            {loading ? "Entrando..." : "Entrar"}
+            {loading ? "Iniciando sesion..." : "Iniciar sesion"}
           </button>
         </form>
         <p className="auth-footer">
-          No tienes cuenta? <Link to="/register">Crear cuenta</Link>
+          No tienes cuenta? <Link to="/register">Crear una</Link>
         </p>
       </div>
     </div>

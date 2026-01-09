@@ -2,6 +2,7 @@ package com.granada.guide.config;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
@@ -14,10 +15,18 @@ public class WebConfig implements WebMvcConfigurer {
   @Value("${app.upload.dir}")
   private String uploadDir;
 
+  @Value("${app.cors.allowed-origins:http://localhost:5173,http://127.0.0.1:5173,http://192.168.*.*:5173,http://10.*.*.*:5173,http://172.*.*.*:5173}")
+  private String allowedOrigins;
+
   @Override
   public void addCorsMappings(CorsRegistry registry) {
+    String[] origins = Arrays.stream(allowedOrigins.split(","))
+        .map(String::trim)
+        .filter(origin -> !origin.isEmpty())
+        .toArray(String[]::new);
+
     registry.addMapping("/api/**")
-        .allowedOrigins("http://localhost:5173")
+        .allowedOriginPatterns(origins)
         .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
         .allowedHeaders("*")
         .allowCredentials(true);

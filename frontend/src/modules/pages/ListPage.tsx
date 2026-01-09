@@ -83,6 +83,11 @@ export function ListPage() {
       ? "No tienes sitios pendientes por ahora."
       : "Aun no has marcado sitios como visitados.";
 
+  const pendingTabId = "list-tab-pending";
+  const visitedTabId = "list-tab-visited";
+  const activeTabId = status === "PENDING" ? pendingTabId : visitedTabId;
+  const panelId = status === "PENDING" ? "list-panel-pending" : "list-panel-visited";
+
   const openOnMap = (placeId: number) => {
     localStorage.setItem("granada.focusPlaceId", placeId.toString());
     navigate("/");
@@ -92,6 +97,7 @@ export function ListPage() {
     if (!token) return;
     const confirmed = window.confirm(`Seguro que quieres borrar "${place.name}"?`);
     if (!confirmed) return;
+    setError(null);
     setDeletingId(place.id);
     try {
       await api.deletePlace(token, place.id);
@@ -122,7 +128,10 @@ export function ListPage() {
               className={`chip ${status === "PENDING" ? "chip--active" : ""}`}
               onClick={() => setStatus("PENDING")}
               aria-selected={status === "PENDING"}
+              aria-controls="list-panel-pending"
+              id={pendingTabId}
               role="tab"
+              tabIndex={status === "PENDING" ? 0 : -1}
             >
               Pendientes
               <span className="list-tabs__count">{pendingCount}</span>
@@ -131,7 +140,10 @@ export function ListPage() {
               className={`chip ${status === "VISITED" ? "chip--active" : ""}`}
               onClick={() => setStatus("VISITED")}
               aria-selected={status === "VISITED"}
+              aria-controls="list-panel-visited"
+              id={visitedTabId}
               role="tab"
+              tabIndex={status === "VISITED" ? 0 : -1}
             >
               Visitados
               <span className="list-tabs__count">{visitedCount}</span>
@@ -143,90 +155,101 @@ export function ListPage() {
         </div>
       </header>
 
-      {loading && <p className="muted">Cargando lista...</p>}
       {error && <p className="form-error">{error}</p>}
 
-      {loading && (
-        <div className="list-grid list-grid--skeleton">
-          {Array.from({ length: 6 }).map((_, index) => (
-            <div key={`skeleton-${index}`} className="list-card list-card--skeleton">
-              <div className="list-card__skeleton-line"></div>
-              <div className="list-card__skeleton-line list-card__skeleton-line--wide"></div>
-              <div className="list-card__skeleton-block"></div>
-              <div className="list-card__skeleton-block list-card__skeleton-block--tall"></div>
-              <div className="list-card__skeleton-actions"></div>
-            </div>
-          ))}
-        </div>
-      )}
+      <section
+        className="list-panel"
+        role="tabpanel"
+        id={panelId}
+        aria-labelledby={activeTabId}
+      >
+        {loading && <p className="muted">Cargando lista...</p>}
 
-      {!loading && filtered.length === 0 && (
-        <p className="list-empty muted">{emptyMessage}</p>
-      )}
+        {loading && (
+          <div className="list-grid list-grid--skeleton">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div key={`skeleton-${index}`} className="list-card list-card--skeleton">
+                <div className="list-card__skeleton-line"></div>
+                <div className="list-card__skeleton-line list-card__skeleton-line--wide"></div>
+                <div className="list-card__skeleton-block"></div>
+                <div className="list-card__skeleton-block list-card__skeleton-block--tall"></div>
+                <div className="list-card__skeleton-actions"></div>
+              </div>
+            ))}
+          </div>
+        )}
 
-      {!loading && filtered.length > 0 && (
-        <div className="list-grid">
-          {filtered.map((place) => {
-            const rawDate = place.visitedAt ?? place.createdAt;
-            const displayDate = rawDate ? new Date(rawDate) : null;
-            const categoryKey = resolveCategoryKey(place.category?.icon ?? null);
-            return (
-              <article
-                key={place.id}
-                className={`list-card list-card--${place.status.toLowerCase()}`}
-              >
-                <div className="list-card__header">
-                  <div className="list-card__badges">
-                    <span className={`status-pill status-pill--${place.status.toLowerCase()}`}>
-                      {STATUS_LABELS[place.status]}
-                    </span>
-                    {place.category && (
-                      <span className={`category-pill category-pill--${categoryKey}`}>
-                        {place.category.name}
+        {!loading && filtered.length === 0 && (
+          <p className="list-empty muted">{emptyMessage}</p>
+        )}
+
+        {!loading && filtered.length > 0 && (
+          <div className="list-grid">
+            {filtered.map((place) => {
+              const rawDate = place.visitedAt ?? place.createdAt;
+              const displayDate = rawDate ? new Date(rawDate) : null;
+              const categoryKey = resolveCategoryKey(place.category?.icon ?? null);
+              return (
+                <article
+                  key={place.id}
+                  className={`list-card list-card--${place.status.toLowerCase()}`}
+                >
+                  <div className="list-card__header">
+                    <div className="list-card__badges">
+                      <span className={`status-pill status-pill--${place.status.toLowerCase()}`}>
+                        {STATUS_LABELS[place.status]}
                       </span>
+                      {place.category && (
+                        <span className={`category-pill category-pill--${categoryKey}`}>
+                          {place.category.name}
+                        </span>
+                      )}
+                    </div>
+                    {displayDate && (
+                      <time
+                        className="list-card__date muted"
+                        dateTime={displayDate.toISOString()}
+                      >
+                        {displayDate.toLocaleDateString()}
+                      </time>
                     )}
                   </div>
-                  {displayDate && (
-                    <time className="list-card__date muted" dateTime={displayDate.toISOString()}>
-                      {displayDate.toLocaleDateString()}
-                    </time>
+                  <h3 className="list-card__title">{place.name}</h3>
+                  <div className="list-card__meta">
+                    <span className="list-card__meta-label">Lugar</span>
+                    <span className={`list-card__meta-value ${place.address ? "" : "muted"}`}>
+                      {place.address ? place.address : "Direccion pendiente"}
+                    </span>
+                  </div>
+                  {place.notes ? (
+                    <p className="list-card__notes">{place.notes}</p>
+                  ) : (
+                    <p className="list-card__notes list-card__notes--empty">
+                      Sin notas aun.
+                    </p>
                   )}
-                </div>
-                <h3 className="list-card__title">{place.name}</h3>
-                <div className="list-card__meta">
-                  <span className="list-card__meta-label">Lugar</span>
-                  <span className={`list-card__meta-value ${place.address ? "" : "muted"}`}>
-                    {place.address ? place.address : "Direccion pendiente"}
-                  </span>
-                </div>
-                {place.notes ? (
-                  <p className="list-card__notes">{place.notes}</p>
-                ) : (
-                  <p className="list-card__notes list-card__notes--empty">
-                    Sin notas aun.
-                  </p>
-                )}
-                <div className="list-card__actions">
-                  <button
-                    className="primary-button"
-                    onClick={() => openOnMap(place.id)}
-                    aria-label={`Ver ${place.name} en el mapa`}
-                  >
-                    Ver en el mapa
-                  </button>
-                  <button
-                    className="ghost-button ghost-button--danger"
-                    onClick={() => handleDeletePlace(place)}
-                    disabled={deletingId === place.id}
-                  >
-                    {deletingId === place.id ? "Eliminando..." : "Eliminar"}
-                  </button>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
+                  <div className="list-card__actions">
+                    <button
+                      className="primary-button"
+                      onClick={() => openOnMap(place.id)}
+                      aria-label={`Ver ${place.name} en el mapa`}
+                    >
+                      Ver en el mapa
+                    </button>
+                    <button
+                      className="ghost-button ghost-button--danger"
+                      onClick={() => handleDeletePlace(place)}
+                      disabled={deletingId === place.id}
+                    >
+                      {deletingId === place.id ? "Eliminando..." : "Eliminar"}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

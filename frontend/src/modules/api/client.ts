@@ -37,13 +37,13 @@ export async function apiRequest<T>(
   });
 
   if (!response.ok) {
-    let errorBody: ApiError = { message: "Request failed" };
+    let errorBody: ApiError = { message: "No se pudo completar la solicitud" };
     try {
       errorBody = await response.json();
     } catch {
-      errorBody = { message: response.statusText || "Request failed" };
+      errorBody = { message: response.statusText || "No se pudo completar la solicitud" };
     }
-    throw new Error(errorBody.message || "Request failed");
+    throw new Error(errorBody.message || "No se pudo completar la solicitud");
   }
 
   if (response.status === 204) {

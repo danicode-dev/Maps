@@ -10,41 +10,36 @@ import java.time.Instant;
 
 public class PlaceDtos {
   public record CreatePlaceRequest(
-      @NotNull Long groupId,
       @NotBlank @Size(max = 200) String name,
-      String description,
-      @NotNull Long categoryId,
       @NotNull Double lat,
       @NotNull Double lng,
-      String address
+      @NotNull PlaceVisitStatus status,
+      @Size(max = 2000) String notes,
+      @Size(max = 255) String address,
+      Long categoryId
   ) {}
 
   public record UpdatePlaceRequest(
       @Size(max = 200) String name,
-      String description,
-      Long categoryId,
-      Double lat,
-      Double lng,
-      String address
+      @Size(max = 2000) String notes,
+      @Size(max = 255) String address,
+      PlaceVisitStatus status,
+      Instant visitedAt,
+      Long categoryId
   ) {}
 
   public record PlaceResponse(
       Long id,
       Long groupId,
       String name,
-      String description,
-      CategorySummary category,
       Double lat,
       Double lng,
+      PlaceVisitStatus status,
+      String notes,
       String address,
+      CategorySummary category,
       UserSummary createdBy,
       Instant createdAt,
-      PlaceVisitStatus status,
-      boolean favorite
-  ) {}
-
-  public record UpdateStatusRequest(
-      @NotNull PlaceVisitStatus status,
-      boolean isFavorite
+      Instant visitedAt
   ) {}
 }

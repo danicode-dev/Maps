@@ -15,11 +15,11 @@ export default defineConfig({
       manifest: {
         name: "Granada Guide",
         short_name: "Granada",
-        description: "Private couple guide for places and memories",
-        theme_color: "#f5efe6",
-        background_color: "#f5efe6",
+        description: "Mapa privado para guardar sitios en pareja",
+        theme_color: "#f7f1e8",
+        background_color: "#f7f1e8",
         display: "standalone",
-        start_url: "/app/map",
+        start_url: "/",
         icons: [
           {
             src: "icons/icon-192.png",
@@ -42,6 +42,9 @@ export default defineConfig({
     })
   ],
   server: {
+    host: true,
+    port: 5173,
+    strictPort: true,
     proxy: {
       "/api": "http://localhost:8080",
       "/uploads": "http://localhost:8080"

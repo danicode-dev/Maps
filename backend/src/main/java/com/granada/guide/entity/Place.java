@@ -2,17 +2,16 @@ package com.granada.guide.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 
 @Entity
 @Table(name = "places")
@@ -28,8 +27,8 @@ public class Place {
   @Column(nullable = false)
   private String name;
 
-  @Column(columnDefinition = "TEXT")
-  private String description;
+  @Column(name = "description", columnDefinition = "TEXT")
+  private String notes;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "category_id")
@@ -41,6 +40,13 @@ public class Place {
   @Column(nullable = false)
   private Double lng;
 
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false)
+  private PlaceVisitStatus status = PlaceVisitStatus.PENDING;
+
+  @Column(name = "visited_at")
+  private Instant visitedAt;
+
   @Column
   private String address;
 
@@ -50,9 +56,6 @@ public class Place {
 
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt = Instant.now();
-
-  @OneToMany(mappedBy = "place")
-  private List<PlaceStatus> statuses = new ArrayList<>();
 
   public Long getId() {
     return id;
@@ -78,12 +81,12 @@ public class Place {
     this.name = name;
   }
 
-  public String getDescription() {
-    return description;
+  public String getNotes() {
+    return notes;
   }
 
-  public void setDescription(String description) {
-    this.description = description;
+  public void setNotes(String notes) {
+    this.notes = notes;
   }
 
   public Category getCategory() {
@@ -110,6 +113,22 @@ public class Place {
     this.lng = lng;
   }
 
+  public PlaceVisitStatus getStatus() {
+    return status;
+  }
+
+  public void setStatus(PlaceVisitStatus status) {
+    this.status = status;
+  }
+
+  public Instant getVisitedAt() {
+    return visitedAt;
+  }
+
+  public void setVisitedAt(Instant visitedAt) {
+    this.visitedAt = visitedAt;
+  }
+
   public String getAddress() {
     return address;
   }
@@ -132,13 +151,5 @@ public class Place {
 
   public void setCreatedAt(Instant createdAt) {
     this.createdAt = createdAt;
-  }
-
-  public List<PlaceStatus> getStatuses() {
-    return statuses;
-  }
-
-  public void setStatuses(List<PlaceStatus> statuses) {
-    this.statuses = statuses;
   }
 }

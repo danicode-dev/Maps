@@ -55,7 +55,7 @@ public class CommentService {
 
   private Place getPlaceForMember(Long placeId, Long userId) {
     Place place = placeRepository.findById(placeId)
-        .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Place not found"));
+        .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Sitio no encontrado"));
     groupService.getGroupForMember(place.getGroup().getId(), userId);
     return place;
   }
