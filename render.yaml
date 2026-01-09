@@ -4,7 +4,6 @@ services:
     runtime: docker
     dockerfilePath: ./backend/Dockerfile.render
     dockerContext: ./backend
-    plan: free
     envVars:
       - key: DB_URL
         fromDatabase:
@@ -47,7 +46,6 @@ services:
     runtime: static
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/dist
-    plan: free
     headers:
       - path: /*
         name: Cache-Control
@@ -65,6 +63,5 @@ services:
 
 databases:
   - name: granada-guide-db
-    plan: free
     databaseName: granada_guide
     user: granada
